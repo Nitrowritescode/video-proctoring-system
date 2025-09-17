@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Interview {
+  id            String   @id @default(cuid())
+  roomId        String   @unique @default(cuid())
+  candidateName String?
+  
+  // Time tracking
+  startTime     DateTime @default(now())
+  endTime       DateTime?
+  duration      Int?     // in minutes
+  
+  // Video
+  videoUrl      String?
+
+  //proctoring report (PDF)
+  pdfUrl      String?
+  
+  // Scoring
+  integrityScore Int     @default(100)
+  totalEvents   Int     @default(0)
+  
+  // Event counts for easy reporting
+  focusLostCount     Int @default(0)
+  phoneDetectedCount Int @default(0)
+  multipleFacesCount Int @default(0)
+  noFaceCount        Int @default(0)
+  notesDetectedCount Int @default(0)
+  
+  // Status
+  status        String   @default("active") // active, completed
+  
+  // Events relationship
+  events        DetectionEvent[]
+  
+  createdAt     DateTime @default(now())
+  
+  @@map("interviews")
+}
+
+model DetectionEvent {
+  id          String   @id @default(cuid())
+  interviewId String
+  
+  // Event details
+  type        String   // FOCUS_LOST, PHONE_DETECTED, etc.
+  timestamp   DateTime @default(now())
+  confidence  Float    @default(0.8)
+  
+  // Relations
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  
+  @@map("detection_events")
+}
