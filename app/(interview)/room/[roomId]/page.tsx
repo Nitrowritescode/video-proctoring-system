@@ -62,52 +62,63 @@ export default function RoomPage() {
   const initializeDetection = async () => {
     try {
       console.log('🔧 Detection system initialize kar rahe hain...')
+      setDetectionInitialized(false) // Reset state
+      
+      // Set timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        console.warn('⚠️ Detection initialization timeout, proceeding anyway...')
+        setDetectionInitialized(true)
+      }, 15000) // 15 seconds timeout
       
       const success = await detectionSystem.initialize()
       
+      clearTimeout(timeout) // Clear timeout if successful
+      
       if (success) {
-        setDetectionInitialized(true)
-        
-        // Set event callback
-        detectionSystem.setEventCallback((event: DetectionEvent) => {
-          console.log('📝 New detection event:', event)
-          
-          setEvents(prev => [...prev, event])
-          
-          // Deduct score based on event type
-          let deduction = 0
-          switch (event.type) {
-            case 'FOCUS_LOST':
-              deduction = 5
-              break
-            case 'NO_FACE':
-              deduction = 10
-              break
-            case 'MULTIPLE_FACES':
-              deduction = 15
-              break
-            case 'PHONE_DETECTED':
-              deduction = 20
-              break
-            case 'NOTES_DETECTED':
-              deduction = 15
-              break
-            case 'BOOK_DETECTED':
-              deduction = 15
-              break
-          }
-          
-          setIntegrityScore(prev => Math.max(0, prev - deduction))
-          console.log(`📊 Score deducted: ${deduction}, New score: ${Math.max(0, integrityScore - deduction)}`)
-        })
-        
-        console.log('✅ Detection system ready!')
+        console.log('✅ Detection system initialized successfully!')
       } else {
-        console.error('❌ Detection system initialize nahi hua')
+        console.warn('⚠️ Detection system had issues but continuing...')
       }
+      
+      setDetectionInitialized(true)
+      
+      // Set event callback
+      detectionSystem.setEventCallback((event: DetectionEvent) => {
+        console.log('📝 New detection event:', event)
+        
+        setEvents(prev => [...prev, event])
+        
+        // Deduct score based on event type
+        let deduction = 0
+        switch (event.type) {
+          case 'FOCUS_LOST':
+            deduction = 5
+            break
+          case 'NO_FACE':
+            deduction = 10
+            break
+          case 'MULTIPLE_FACES':
+            deduction = 15
+            break
+          case 'PHONE_DETECTED':
+            deduction = 20
+            break
+          case 'NOTES_DETECTED':
+            deduction = 15
+            break
+          case 'BOOK_DETECTED':
+            deduction = 15
+            break
+        }
+        
+        setIntegrityScore(prev => Math.max(0, prev - deduction))
+        console.log(`📊 Score deducted: ${deduction}`)
+      })
       
     } catch (error) {
       console.error('❌ Detection initialization error:', error)
+      // Don't let detection failure block the UI
+      setDetectionInitialized(true)
     }
   }
 
@@ -138,11 +149,12 @@ export default function RoomPage() {
 
   // Start interview
   const startInterview = () => {
-    if (!stream || !detectionInitialized) {
-      alert('Please wait for camera and detection system to initialize')
+    if (!stream) {
+      alert('Please wait for camera to initialize')
       return
     }
 
+    // Don't block interview start if detection is still loading
     console.log('🎬 Interview start ho raha hai...')
     
     // Start recording
@@ -170,8 +182,20 @@ export default function RoomPage() {
     setRecording(true)
     setStartTime(new Date())
     
-    // Start detection
-    startDetectionLoop()
+    // Start detection if ready, otherwise continue without it
+    if (detectionInitialized) {
+      startDetectionLoop()
+      console.log('🔄 Detection started with interview')
+    } else {
+      console.warn('⚠️ Starting interview without detection (still loading)')
+      // Try to start detection anyway after a delay
+      setTimeout(() => {
+        if (detectionInitialized) {
+          startDetectionLoop()
+          console.log('🔄 Detection started after delay')
+        }
+      }, 5000)
+    }
     
     console.log('✅ Interview started successfully!')
   }
@@ -349,9 +373,11 @@ export default function RoomPage() {
                     <Button 
                       onClick={startInterview}
                       className="w-full bg-green-600 hover:bg-green-700"
-                      disabled={!detectionInitialized}
                     >
                       Start Interview
+                      {!detectionInitialized && (
+                        <span className="ml-2 text-xs opacity-75">(Detection loading...)</span>
+                      )}
                     </Button>
                   )}
                   
